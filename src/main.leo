@@ -6,73 +6,111 @@ program nft.aleo {
     record NftOwnershipInstance {
         owner: address,
         gates: u64,
-        data: NftData,
+        id: u32,
+        data: NftPrivateData,
     }
 
     record NftReceipt {
         owner: address,
         gates: u64,
+        id: u32,
         nft_owner: address
     }
 
-    struct NftData {
+    struct NftPrivateData {
         half1: u128, // Part 1 of Arweave Transaction ID, a SHA-256 signature
         half2: u128, // Part 1 of Arweave Transaction ID, a SHA-256 signature
 
         metadata: u128 // Arbitrary 128-bytes of metadata.
     }
 
+    struct NftPublicData {
+        metadata: u128
+    }
+
+    // IDs => owner
+    mapping nft_owners: u32 => address;
+    mapping nft_public_data: u32 => NftPublicData;
+
     // Privately mints an NFT with 'data' for the reciever.
-    transition mint_private(receiver: address, data: NftData) -> (NftOwnershipInstance, NftReceipt) {
+    // To update data, a collection owner would issue a new NFT to the owner of the prior NFT.
+    transition mint_private(
+        id: u32,
+        receiver: address,
+        private_data: NftPrivateData,
+        public public_data: NftPublicData) -> (NftOwnershipInstance, NftReceipt) {
         assert_eq(self.caller, COLLECTION_OWNER);
 
         let owner: NftOwnershipInstance = NftOwnershipInstance {
             owner: receiver,
             gates: 0u64,
+            id: id,
             data: data
         };
 
         let creator: NftReceipt = NftReceipt {
             owner: COLLECTION_OWNER,
             gates: 0u64,
+            id: id,
             nft_owner: receiver
         };
 
-        return (owner, creator);
+        return (owner, creator) then finalize(id, COLLECTION_OWNER, public_data);
+    } 
+
+    finalize mint_private(
+        public id: u32,
+        public receiver: address,
+        public public_data: NftPublicData
+    ) {
+        nft_owners[id] = receiver;
+        nft_public_data[id] = public_data;
     }
 
-    // Modifies an NFTs data
-    transition modify_data(creator: NftReceipt, new_data: NftData) -> NftOwnershipInstance {
-        return NftOwnershipInstance {
-            owner: creator.nft_owner,
-            gates: 0u64,
-            data: new_data
-        };
-    }
-
-    // Transfers an NFT to a new owner, where the new owner is not publically known.
+    // Transfers a private NFT to a new owner, where the new owner is not publically known.
     transition transfer_private(nft: NftOwnershipInstance, receiver: address) -> (NftOwnershipInstance, NftReceipt) {
         let owner: NftOwnershipInstance = NftOwnershipInstance {
-            owner: nft.owner,
+            owner: receiver,
             gates: 0u64,
+            id: nft.id,
             data: nft.data
         };
 
         let creator: NftReceipt = NftReceipt {
             owner: COLLECTION_OWNER,
             gates: 0u64,
+            id: nft.id,
             nft_owner: receiver
         };
 
-        return (owner, creator);
+        return (owner, creator) then finalize(nft.id);
+    }
+
+    finalize transfer_private(id: u32) {
+        nft_owners[id] = COLLECTION_OWNER;
     }
 
     // Transfers an NFT to a new owner, where the new owner is publically known.
-    transition transfer_public(public nft: NftOwnershipInstance, public receiver: address) {
+    transition transfer_public(nft: NftOwnershipInstance, public receiver: address) -> (NftOwnershipInstance, NftReceipt) {
+        let owner: NftOwnershipInstance = NftOwnershipInstance {
+            owner: receiver,
+            gates: 0u64,
+            id: nft.id,
+            data: nft.data
+        };
+
+        let creator: NftReceipt = NftReceipt {
+            owner: COLLECTION_OWNER,
+            gates: 0u64,
+            id: nft.id,
+            nft_owner: receiver
+        };
+
+        return (owner, creator) then finalize(nft.id, receiver);
     }
 
-    // Converts a private NFT to a public NFT.
-    transition convert_public_to_private(nft: NftOwnershipInstance) {
+    finalize transfer_public(id: u32, receiver: address) {
+        nft_owners[id] = receiver;
     }
 }
 
