@@ -1,12 +1,21 @@
 # nft.aleo
+Note: The most recent commit is waiting on mapping functionality to be approved.
 
-## Build Guide
+## Implementation
 
-To compile this Aleo program, run:
+In this, we implemented minting an NFT with hidden fields on the Aleo chain. NFTs with hidden attributes can be transfered to publically known addresses, they can also be transferred to hidden addresses.  
+
+
+## Usage For Commit Hash 9cf6b4888139e6febaf72cbff416f6978eda79f7
+
+To mint a new NFT with private fields, run:
 ```bash
-
 leo run mint_private aleo10f7vqg5kjv55dvvml67d05c3vg0suuzplxrnudkf8h4hn7n3wcyq53yxat "{half1: 2u128, half2: 2u128}"
-leo run transfer private "{
+```
+
+To transfer your NFT, run:
+```bash
+leo run transfer_private "{
   owner: aleo10f7vqg5kjv55dvvml67d05c3vg0suuzplxrnudkf8h4hn7n3wcyq53yxat.private,
   gates: 0u64.private,
   data: {
